@@ -7,7 +7,7 @@ JUMPIFEQ end GF@counter string@aaa
 WRITE string@counter\032obsahuje\032
 WRITE GF@counter
 WRITE string@fuu\1234
-DEFVAR LF@noob
+DEFVAR LF@noob #
 WRITE string@\010
 CONCAT GF@counter GF@counter string@a
 WRITE int@a<hr&ef>b

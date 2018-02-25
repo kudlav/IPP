@@ -5,6 +5,19 @@
  * Date: 25.02.2018
  */
 
+class Stats
+{
+	public $lines, $comments, $path, $opts;
+
+	public function __construct()
+	{
+		$this->lines = 0;
+		$this->comments = 0;
+		$this->path = '';
+		$this->opts = [];
+	}
+}
+
 $instructions = [ // var = variable; symb = constant or variable; label = label
 	"MOVE" => ['var', 'symb'],
 	"CREATEFRAME" => [],
@@ -42,11 +55,7 @@ $instructions = [ // var = variable; symb = constant or variable; label = label
 	"BREAK" => []
 ];
 
-$stats = [
-	'lines' => 0,
-	'comments' => 0,
-	'opts' => []
-];
+$stats = new Stats();
 
 // MAIN BEGIN //
 parseParameters($argv, $stats);
@@ -67,9 +76,10 @@ $xml->endElement();
 $xml->endDocument();
 echo $xml->outputMemory();
 
-if (isset($stats['path'])) {
+if (isset($stats->path)) {
 	writeStats($stats);
 }
+
 // MAIN END //
 
 
@@ -86,23 +96,26 @@ function parseParameters($argv, $stats)
 				exit(0);
 			}
 			else if (preg_match('~^(\-\-stats|\-s)=(.*)$~', $argument, $matches)) {
-				$stats['path'] = $matches[2];
+				$stats->path = $matches[2];
 			}
 			else if ($argument == '--loc' || $argument == '-l') {
-				if (count($stats['opts'])==0 || $stats['opts'][0]!='lines') {
-					$stats['opts'][] = 'lines';
+				if (count($stats->opts)==0 || $stats->opts[0]!='lines') {
+					$stats->opts[] = 'lines';
 				}
 				else exit(10);
 			}
 			else if ($argument == '--comments'  || $argument == '-c') {
-				if (count($stats['opts'])==0 || $stats['opts'][0]!='comments') {
-					$stats['opts'][] = 'comments';
+				if (count($stats->opts)==0 || $stats->opts[0]!='comments') {
+					$stats->opts[] = 'comments';
 				}
 				else exit(10);
 			}
+			else {
+				exit(10);
+			}
 		}
 
-		if (count($stats['opts']) && !isset($stats['path'])) { // Stats not enabled, unable to format output
+		if (count($stats->opts) && !isset($stats->path)) { // Stats not enabled, unable to format output
 			exit(10);
 		}
 	}
@@ -121,7 +134,7 @@ function parseHeader()
 
 /**
  * Load one line from stdin.
- * @param array $stats
+ * @param Stats $stats
  * @return array|null Return array with tokens or null when reached EOF.
  */
 function loadLine($stats)
@@ -139,7 +152,7 @@ function loadLine($stats)
 
 			if ($char == "#") { // Reached comment, ignore everything till EOL
 				$comment = true;
-				$stats['comments']++;
+				$stats->comments++;
 				continue;
 			}
 
@@ -155,7 +168,7 @@ function loadLine($stats)
 	if ($tmp) $line[] = $tmp; // Close last token
 
 	if (!empty($line)) {
-		$stats['lines']++;
+		$stats->lines++;
 	}
 
 	return $line;
@@ -273,15 +286,16 @@ function parseLabel($xml, $token)
 
 /**
  * Write statistic data into selected file.
- * @param $stats
+ * @param Stats $stats
  */
 function writeStats($stats)
 {
 	$data = "";
-	foreach ($stats['opts'] as $opt) {
-		$data.= $stats[$opt].PHP_EOL;
+	foreach ($stats->opts as $opt) {
+		$data.= $stats->$opt;
+		$data.= PHP_EOL;
 	}
-	if (file_put_contents($stats['path'], $data) === false) {
+	if (file_put_contents($stats->path, $data) === false) {
 		exit(12);
 	}
 }
