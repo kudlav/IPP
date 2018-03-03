@@ -68,18 +68,20 @@ $xml->startElement('program');
 $xml->writeAttribute('language', 'IPPcode18');
 
 parseHeader();
-while (($line=loadLine($stats)) !== null) {
-	parseLine($line, $instructions, $xml);
+while (true) {
+	$line = loadLine($stats);
+	if (!parseLine($line, $instructions, $xml)) {
+		break;
+	}
 }
 
 $xml->endElement();
 $xml->endDocument();
 echo $xml->outputMemory();
 
-if (isset($stats->path)) {
+if ($stats->path != '') {
 	writeStats($stats);
 }
-
 // MAIN END //
 
 
@@ -141,34 +143,41 @@ function loadLine($stats)
 {
 	$comment = false;
 	$line = [];
-	$tmp = "";
+	$tmp = '';
 
-	while (($char=fgetc(STDIN)) != "\n") {
+	while (true) {
+		$char = fgetc(STDIN);
+
+		if ($char == "\n") { // Reached EOL
+			break;
+		}
+
+		if ($char === false) { // Reached EOF, add special null token
+			if ($tmp) $line[] = $tmp;
+			$tmp = '';
+			$line[] = false;
+			break;
+		}
 
 		if (!$comment) {
-			if ($char === false) { // EOF, quit.
-				return null;
-			}
-
-			if ($char == "#") { // Reached comment, ignore everything till EOL
+			if ($char == "#") { // Reached comment, ignore everything till EOL or EOF
 				$comment = true;
 				$stats->comments++;
-				continue;
 			}
-
-			if (ctype_space($char)) { // Whitespace - close token
+			else if (ctype_space($char)) { // Whitespace - close token
 				if ($tmp) $line[] = $tmp;
-				$tmp = "";
+				$tmp = '';
 			}
 			else { // Anything else, add to token
 				$tmp .= $char;
 			}
 		}
 	}
-	if ($tmp) $line[] = $tmp; // Close last token
+
+	if ($tmp != '') $line[] = $tmp; // Close last token
 
 	if (!empty($line)) {
-		$stats->lines++;
+		if (count($line) > 1 || $line[0] != "\0") $stats->lines++; // Don't count line with just EOF token.
 	}
 
 	return $line;
@@ -179,12 +188,23 @@ function loadLine($stats)
  * @param array $line
  * @param array $instructions
  * @param XMLWriter $xml
+ * @return bool Return false when reached EOF, true in other case.
  */
 function parseLine($line, $instructions, $xml)
 {
 	static $order = 0; // STATIC VARIABLE!!!
+	$endOfFile = false;
 
 	if (!empty($line)) {
+
+		if (end($line) === false) { // Remove special EOF token
+			$endOfFile = true;
+			unset($line[sizeof($line)-1]);
+			if (empty($line)) {
+				return false;
+			}
+		}
+
 		$opcode = $line[0] = strtoupper($line[0]);
 
 		if (!isset($instructions[$opcode])) { // Instruction doesn't exist
@@ -201,19 +221,24 @@ function parseLine($line, $instructions, $xml)
 		for ($i=1; $i<count($line); $i++) {
 			$xml->startElement('arg'.$i);
 			switch ($instructions[$opcode][$i-1]) {
-				case "var":
+				case 'var':
 					if (!parseVar($xml, $line[$i])) {
 						lineErr($line, "Jako ".$i.". operand ocekavana promenna"); // exit(21)
 					}
 					break;
-				case "symb":
+				case 'symb':
 					if (!parseVar($xml, $line[$i]) && !parseSymb($xml, $line[$i])) {
 						lineErr($line, "Jako ".$i.". operand ocekavana konstanta nebo promenna"); // exit(21)
 					}
 					break;
-				case "label":
+				case 'label':
 					if (!parseLabel($xml, $line[$i])) {
 						lineErr($line, "Jako ".$i.". operand ocekavano navesti"); // exit(21)
+					}
+					break;
+				case 'type':
+					if (!parseType($xml, $line[$i])) {
+						lineErr($line, "Jako ".$i.". iperand ocekavan typ"); // exit(21)
 					}
 					break;
 			}
@@ -221,13 +246,18 @@ function parseLine($line, $instructions, $xml)
 		}
 		$xml->endElement();
 	}
+
+	if ($endOfFile) {
+		return false;
+	}
+	return true;
 }
 
 /**
  * Check string for variable format and write argument into XML on success.
  * @param XMLWriter $xml XML object
  * @param string $token String to evaluate
- * @return bool Return 1 if $token is valid, 0 when invalid, false if an error occurred.
+ * @return bool Return true if $token is valid, false when invalid
  */
 function parseVar($xml, $token)
 {
@@ -243,7 +273,7 @@ function parseVar($xml, $token)
  * Check string for literal format and write argument into XML on success.
  * @param XMLWriter $xml XML object
  * @param string $token String to evaluate
- * @return bool Return type of literal or false when invalid.
+ * @return bool Return type of literal or false when invalid
  */
 function parseSymb($xml, $token)
 {
@@ -272,12 +302,28 @@ function parseSymb($xml, $token)
  * Check string for label format and write argument into XML on success.
  * @param XMLWriter $xml XML object
  * @param string $token String to evaluate
- * @return bool Return 1 if $token is valid, 0 when invalid, false if an error occurred.
+ * @return bool Return true if $token is valid, false when invalid
  */
 function parseLabel($xml, $token)
 {
 	if (preg_match("~^[a-zA-Z-$&%*][\w-$&%*]*$~", $token)) {
 		$xml->writeAttribute('type', 'label');
+		$xml->text($token);
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Check string for type format and write argument into XML on success.
+ * @param XMLWriter $xml XML object
+ * @param string $token String to evaluate
+ * @return bool Return true if $token is valid, false when invalid
+ */
+function parseType($xml, $token)
+{
+	if (preg_match("~^(int|string|bool)$~", $token)) {
+		$xml->writeAttribute('type', 'type');
 		$xml->text($token);
 		return true;
 	}
