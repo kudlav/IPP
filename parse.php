@@ -261,7 +261,7 @@ function parseLine($line, $instructions, $xml)
  */
 function parseVar($xml, $token)
 {
-	if (preg_match("~^(LF|TF|GF)@[a-zA-Z-$&%*][\w-$&%*]*$~", $token)) {
+	if (preg_match("~^(LF|TF|GF)@[a-zA-Z_\-$&%*][\w_\-$&%*]*$~", $token)) {
 		$xml->writeAttribute('type', 'var');
 		$xml->text($token);
 		return true;
@@ -306,7 +306,7 @@ function parseSymb($xml, $token)
  */
 function parseLabel($xml, $token)
 {
-	if (preg_match("~^[a-zA-Z-$&%*][\w-$&%*]*$~", $token)) {
+	if (preg_match("~^[a-zA-Z_\-$&%*][\w_\-$&%*]*$~", $token)) {
 		$xml->writeAttribute('type', 'label');
 		$xml->text($token);
 		return true;
