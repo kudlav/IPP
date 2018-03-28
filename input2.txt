@@ -1,3 +1,4 @@
 .IPPcode18
+WRITE string@fuu\d
 
 DEFVAR noob
