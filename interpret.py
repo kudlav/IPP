@@ -3,22 +3,35 @@
 import getopt
 import sys
 import xml.etree.ElementTree as etree
+import re
 
 
-class Eniroment:
+class Enviroment:
     def __init__(self):
-        self.gf = []
+        self.gf = {}
         self.lf = None
         self.tf = None
+        self.stack = []
+        self.label = {}  # {string: int}
+        self.call = []  # int[]
 
 
 class Variable:
-    def __init__(self, datatype, value):
-        self.datatype = datatype
+    def __init__(self, datatype=None, value=None):
+        self.type = datatype
+        self.value = value
+
+    def __repr__(self):
+        return str(self.type)+"@"+str(self.value)
+
+
+class Argument:
+    def __init__(self, argtype, value):
+        self.type = argtype
         self.value = value
 
 
-def print_help():
+def help_print():
     print("Nacte a interpretuje XML reprezentaci programu ze souboru.\n"
           "\n"
           "Pouziti:\n"
@@ -33,13 +46,107 @@ def print_help():
           "  10   chyba pri zpracovani argumentu"
           "  11   chyba nacitani vstupniho souboru"
           "  31   XML format vstupniho souboru nema pozadovany format"
-          "  32   lexikalni nebo syntakticka chyba")
+          "  32   lexikalni nebo syntakticka chyba"
+          "  53   behova chyba interpretace – spatne typy operandu"
+          "  54   behova chyba interpretace – pristup k neexistujici promenne (ramec existuje)"
+          "  55   behova chyba interpretace – ramec neexistuje (napr. cteni z prazdneho zasobníku ramcu)"
+          "  56   behová chyba interpretace – chybejici hodnota (v promenne nebo na zasobniku)"
+          "  57   behová chyba interpretace – deleni nulou"
+          "  58   behová chyba interpretace – chybna prace s retezcem"
+          "  59   behová chyba interpretace – pokus o redefinovani promenne"
+          )
 
 
-def check_args(opcode, argc):
+def error(order, errno, msg):
+    sys.stderr.write(msg + ", instrukce " + str(order) + "\n")
+    sys.exit(errno)
+
+
+def parse_args(child, order, argc):
     if len(child) != argc:
-        sys.stderr.write('Instrukce ' + opcode + ' ocekava ' + argc + ' argumentu, predano: ' + str(len(child)) + "\n")
+        sys.stderr.write('Instrukce ' + str(order) + ' ocekava ' + str(argc) + ' argument(y), predano: ' + str(len(child)) + "\n")
         sys.exit(32)
+
+    arg = []
+    for i in range(1, argc+1):
+        arg_tag = child.find("arg" + str(i))
+        if arg_tag is None:
+            error(order, 31, 'Instrukce neobsahuje tag "arg' + str(i) + '"')
+        if arg_tag.get("type") is None:
+            error(order, 32, 'Argumentu ' + child[i-1].tag + ' chybi atribut "type"')
+        arg.append(Argument(arg_tag.get("type"), arg_tag.text))
+
+    return arg
+
+
+def parse_label(order, arg):
+    if arg.type != "label":
+        error(order, 53, 'Ocekavan argument typu "label", uveden: "' + arg.type + '"')
+    if re.fullmatch("[a-zA-Z_\-$&%*][\w_\-$&%*]*", arg.value) is None:
+        error(order, 53, 'Argument "' + arg.value + '" typu "label" nesplnuje pozadovany tvar')
+    return arg.value
+
+
+def parse_var(order, arg):
+    if arg.type != "var":
+        error(order, 53, 'Ocekavan argument typu "var", uveden: "' + arg.type + '"')
+    match = re.fullmatch("(LF|TF|GF)@([a-zA-Z_\-$&%*][\w_\-$&%*]*)", arg.value)
+    if match is None:
+        error(order, 53, 'Argument "' + arg.value + '" typu "var" nesplnuje pozadovany tvar')
+    return match
+
+
+def get_var(enviroment, order, match):
+    if match[1] == "GF":
+        return enviroment.gf.get(match[2])
+    elif match[1] == "TF":
+        if enviroment.tf is None:
+            error(order, 55, "Docasny ramec neni definovan")  # exit(55)
+        return enviroment.tf.get(match[2])
+    elif match[1] == "LF":
+        if enviroment.lf is None:
+            error(order, 55, "Lokalni ramec neni nedefinovan")  # exit(55)
+        return enviroment.lf.get(-1).get(match[2])
+
+
+def get_symb(enviroment, order, arg, undefined=False):
+    var = Variable(arg.type)
+    if arg.type == "int":
+        try:
+            var.value = int(arg.value)
+        except (ValueError, TypeError):
+            error(order, 53, 'Hodnota "' + str(arg.value) + '" neni typu int')  # exit(55)
+    elif arg.type == "bool":
+        if arg.value == "true":
+            var.value = True
+        elif arg.value == "false":
+            var.value = False
+        else:
+            error(order, 53, 'Hodnota "' + arg.value + '" neni typu bool')  # exit(55)
+    elif arg.type == "string":
+        if arg.value is None:
+            var.value = ""
+        else:
+            if re.fullmatch("([^\s#\\\\]|\\\\\d{3})+", arg.value) is None:
+                error(order, 53, 'Argument "' + arg.value + '" typu "string" nesplnuje pozadovany tvar')
+            var.value = arg.value
+    elif arg.type == "float":
+        try:
+            var.value = float(arg.value)
+        except (ValueError, TypeError):
+            error(order, 53, 'Hodnota "' + str(arg.value) + '" neni typu float')  # exit(55)
+    elif arg.type == "var":
+        match = parse_var(order, arg)
+        var = get_var(enviroment, order, match)
+        if var is None:
+            error(ip, 54, 'Cteni z neexistujici promenne "' + arg.value + '"')  # exit(54)
+        if var.type is None or var.value is None:
+            if undefined:
+                return None
+            error(ip, 56, 'Promenne "' + arg.value + '" nebyla dosud prirazena hodnota')  # exit(56)
+    else:
+        error(order, 53, 'Ocekavan argument typu int/bool/string/float nebo var, uveden: "' + arg.type + '"')
+    return var
 
 
 if __name__ == "__main__":
@@ -48,30 +155,30 @@ if __name__ == "__main__":
     except getopt.GetoptError as err:
         if err.opt != "":
             sys.stderr.write("Nespravne pouziti parametru: " + err.opt + "\n")
-            print_help()
+            help_print()
         sys.exit(10)
 
     filepath = ""
 
     for option, value in opts:
         if option in ("-h", "--help"):
-            print_help()
+            help_print()
             sys.exit(0)
         elif option in ("-s", "--source"):
             filepath = value
         else:
             sys.stderr.write("Neznamy parametr: " + option + "\n")
-            print_help()
+            help_print()
             sys.exit(10)
 
     if filepath == "":
         sys.stderr.write("Chyby povinny parametr: --source=<file>\n")
-        print_help()
+        help_print()
         sys.exit(10)
 
     try:
         tree = etree.parse(filepath)
-    except FileNotFoundError as err:
+    except FileNotFoundError:
         sys.stderr.write('Soubor "' + filepath + '" neexistuje\n')
         sys.exit(11)
     except etree.ParseError as err:
@@ -81,43 +188,255 @@ if __name__ == "__main__":
     root = tree.getroot()
     if root.tag != "program" or root.get("language") != "IPPcode18":
         sys.stderr.write('Chybi korenovy element "program" s atributem "language=IPPcode18"\n')
-        sys.exit(32)
+        sys.exit(31)
 
-    enviroment = Eniroment()
+    # Check for syntax errors and find index of all LABELs, order instructions
+    enviroment = Enviroment()
+    instructions = {}
+    i_count = 0
+    ip = 1
+    while ip < len(root)+1:
+        child = root[ip-1]
 
-    # Browse instruction elements
-    order = 0
-    for child in root:
         if child.tag != "instruction":
             sys.stderr.write('Ocekavan element "instruction", nalezen "' + child.tag + '"\n')
-            sys.exit(32)
+            sys.exit(31)
 
-        order += 1
-        if child.get("order") != str(order):
-            sys.stderr.write('Chybne poradi instrukce, ocekavano: "' + str(order) + '", uvedeno: "' + child.get("order") + '"\n')
-            sys.exit(32)
+        if child.get("order") is None:
+            sys.stderr.write(str(ip) + '. element "instruction" neobsahuje atribut order\n')
+            sys.exit(31)
+
+        try:
+            order = int(child.get("order"))
+            if order <= 0:
+                raise ValueError
+        except ValueError:
+            sys.stderr.write('Atribut order musi obsahovat cele cislo, predano: "' + child.get("order") + '"\n')
+            sys.exit(31)
+        if order in instructions:
+            sys.stderr.write("Program obsahuje dve instrukce s poradim " + str(order) + "\n")
+            sys.exit(31)
+        instructions[order] = child
+
+        if child.get("opcode").upper() == "LABEL":
+            args = parse_args(child, ip, 1)  # exit(32)
+            label = parse_label(ip, args[0])
+            if label in enviroment.label:
+                error(ip, 56, 'Pokus o redefinovani navesti "' + label + '"')  # exit(56)
+            enviroment.label[label] = ip
+        ip += 1
+
+    # Check continuity of order number
+    for i in range(1, len(root)+1):
+        if i not in instructions:
+            sys.stderr.write("Chybi instrukce s poradovym cislem " + str(i) + "\n")
+            sys.exit(31)
+
+    # Browse instruction elements
+    i_count = 0
+    ip = 1
+    while ip < len(root)+1:
+        child = instructions.get(ip)
 
         opcode = child.get("opcode").upper()
-        print(opcode)  # TODO only for debug
 
         # PARSING INSTRUCTION #
         if opcode == "CREATEFRAME":
-            check_args(opcode, 0)  # exit(32)
-            enviroment.tf = []
+            parse_args(child, ip, 0)  # exit(32)
+            enviroment.tf = {}
 
         elif opcode == "PUSHFRAME":
-            check_args(opcode, 0)  # exit(32)
+            parse_args(child, ip, 0)  # exit(32)
             if enviroment.tf is None:
-                sys.stderr.write("Docasny ramec nedefinovan, neni co vlozit na zasobnik ramcu\n")
-                sys.exit(55)
+                error(ip, 55, "Docasny ramec nedefinovan, neni co vlozit na zasobnik ramcu")  # exit(55)
             if enviroment.lf is None:
-                enviroment.lf = enviroment.tf
-            else:
-                enviroment.lf.append(enviroment.tf)
+                enviroment.lf = []
+            enviroment.lf.append(enviroment.tf)
             enviroment.tf = None
 
+        elif opcode == "POPFRAME":
+            parse_args(child, ip, 0)  # exit(32)
+            if enviroment.lf is None:
+                error(ip, 55, "Seznam lokalnich ramcu je prazdny, neni co vybrat")  # exit(55)
+            enviroment.tf = enviroment.lf.pop()
+            if len(enviroment.lf) == 0:
+                enviroment.lf = None
+
+        elif opcode == "RETURN":
+            parse_args(child, ip, 0)  # exit(32)
+            if len(enviroment.call) == 0:
+                error(ip, 56, "Cteni z prazdneho zasobniku volani")  # exit(56)
+            i = enviroment.call.pop()
+
+        elif opcode == "BREAK":
+            parse_args(child, ip, 0)  # exit(32)
+            sys.stderr.write("Instrukce: " + str(ip) + "\n"
+                             "Vykonano instrukci: " + str(i_count) + "\n"
+                             "Zasobnik volani: " + str(enviroment.call) + "\n"
+                             "Zasobnik navesti: " + str(enviroment.label) + "\n"
+                             "Datovy zasobnik: " + str(enviroment.stack) + "\n"
+                             "Globalni ramec: " + str(enviroment.gf) + "\n"
+                             "Lokalni ramce: " + str(enviroment.lf) + "\n"
+                             "Docasny ramec: " + str(enviroment.tf) + "\n"
+                             )
+
+        elif opcode == "CALL":
+            args = parse_args(child, ip, 1)  # exit(32)
+            label = parse_label(ip, args[0])
+            if label not in enviroment.label:
+                error(ip, 52, 'Navesti "' + label + '" nenalezeno')  # exit(52)
+            enviroment.call.append(ip+1)
+            ip = enviroment.label.get(label)
+
+        elif opcode == "JUMP":
+            args = parse_args(child, ip, 1)  # exit(32)
+            label = parse_label(ip, args[0])
+            if label not in enviroment.label:
+                error(ip, 52, 'Navesti "' + label + '" nenalezeno')  # exit(52)
+            ip = enviroment.label.get(label)
+
+        elif opcode == "DEFVAR":
+            args = parse_args(child, ip, 1)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            if var is not None:
+                error(ip, 59, 'Pokus o redefinovani promenne "' + match[0])  # exit(59)
+            if match[1] == "GF":
+                enviroment.gf[match[2]] = Variable()
+            elif match[1] == "TF":
+                enviroment.tf[match[2]] = Variable()
+            elif match[1] == "LF":
+                enviroment.tf[match[2]] = Variable()
+
+        elif opcode == "POPS":
+            args = parse_args(child, ip, 1)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            if len(enviroment.stack) == 0:
+                error(ip, 56, 'Datovy zasovnik je prazdny "' + match[2])  # exit(56)
+            if var is None:
+                error(ip, 54, 'Pristup k neexistujici promenne "' + match[0] + '"')  # exit(54)
+            src = enviroment.stack.pop()
+            var.type = src.type
+            var.value = src.value
+
+        elif opcode == "PUSHS":
+            args = parse_args(child, ip, 1)  # exit(32)
+            symb = get_symb(enviroment, ip, args[0])  # exit(55/54)
+            enviroment.stack.append(symb)
+
+        elif opcode == "WRITE":
+            args = parse_args(child, ip, 1)  # exit(32)
+            symb = get_symb(enviroment, ip, args[0])  # exit(55/54)
+            if symb.type == "bool":
+                print(str(symb.value).lower())
+            else:
+                print(symb.value)
+
+        elif opcode == "DPRINT":
+            args = parse_args(child, ip, 1)  # exit(32)
+            symb = get_symb(enviroment, ip, args[0])  # exit(55/54)
+            if symb.type == "bool":
+                sys.stderr.write(str(symb.value).lower() + "\n")
+            else:
+                sys.stderr.write(symb.value + "\n")
+
+        elif opcode == "MOVE":
+            args = parse_args(child, ip, 2)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            var.type = symb.type
+            var.value = symb.value
+
+        elif opcode == "TYPE":
+            args = parse_args(child, ip, 2)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb = get_symb(enviroment, ip, args[1], True)  # exit(54/55/56)
+            var.type = "string"
+            if symb is not None:
+                var.value = symb.type
+            else:
+                var.value = ""
+
+        elif opcode == "STRLEN":
+            args = parse_args(child, ip, 2)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb = get_symb(enviroment, ip, args[1], True)  # exit(54/55/56)
+            if symb.type != "string":
+                error(ip, 53, "2. argument instrukce STRLEN musi byt retezec")
+            var.type = "int"
+            var.value = len(symb.value)
+
+        elif opcode == "INT2CHAR":
+            args = parse_args(child, ip, 2)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            try:
+                if symb.type != "int":
+                    print(symb.type)
+                    print(symb.value)
+                    raise ValueError
+                var.value = chr(symb.value)
+            except ValueError:
+                error(ip, 58, "arg2 instrukce INT2CHAR musi byt hodnota Unicode")  # exit(58)
+            var.type = "string"
+
+        elif opcode == "ADD":
+            args = parse_args(child, ip, 3)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if symb1.type != "int" or symb2.type != "int":
+                error(ip, 58, 'arg2 a arg3 instrukce ADD musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
+            var.type = "int"
+            var.value = symb1.value + symb2.value
+
+        elif opcode == "SUB":
+            args = parse_args(child, ip, 3)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if symb1.type != "int" or symb2.type != "int":
+                error(ip, 58, 'arg2 a arg3 instrukce SUB musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
+            var.type = "int"
+            var.value = symb1.value - symb2.value
+
+        elif opcode == "MUL":
+            args = parse_args(child, ip, 3)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if symb1.type != "int" or symb2.type != "int":
+                error(ip, 58, 'arg2 a arg3 instrukce MUL musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
+            var.type = "int"
+            var.value = symb1.value * symb2.value
+
+        elif opcode == "IDIV":
+            args = parse_args(child, ip, 3)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if symb1.type != "int" or symb2.type != "int":
+                error(ip, 58, 'arg2 a arg3 instrukce IDIV musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
+            if symb2.value == 0:
+                error(ip, 57, "Deleni nulou")  # exit(57)
+            var.type = "int"
+            var.value = symb1.value // symb2.value
+
         else:
-            sys.stderr.write('Neznama instrukce: "' + opcode + '"\n')
-            sys.exit(32)
+            if opcode != "LABEL":
+                sys.stderr.write('Neznama instrukce: "' + opcode + '"\n')
+                sys.exit(32)
+
+        ip += 1
+        i_count += 1
 
     sys.exit(0)

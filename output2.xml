@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="IPPcode18">
+    <instruction order="1" opcode="CREATEFRAME" />
+    <instruction order="2" opcode="PUSHFRAME" />
+    <instruction order="3" opcode="CREATEFRAME" />
+    <instruction order="4" opcode="POPFRAME" />
+    <instruction order="5" opcode="BREAK" />
+    <instruction order="6" opcode="LABEL">
+        <arg1 type="label">X_0&amp;9-*%$foo0</arg1>
+    </instruction>
+    <instruction order="7" opcode="defvar">
+        <arg1 type="var">GF@label</arg1>
+    </instruction>
+    <instruction order="8" opcode="PUSHS">
+        <arg1 type="string">counter\032obsahuje\032</arg1>
+    </instruction>
+    <instruction order="9" opcode="CALL">
+        <arg1 type="label">end</arg1>
+    </instruction>
+    <instruction order="11" opcode="LABEL">
+        <arg1 type="label">_end</arg1>
+    </instruction>
+    <instruction order="10" opcode="LABEL">
+        <arg1 type="label">end</arg1>
+    </instruction>
+    <instruction order="12" opcode="DEFVAR">
+        <arg1 type="var">TF@label</arg1>
+    </instruction>
+    <instruction order="13" opcode="PUSHS">
+        <arg1 type="int">+12345</arg1>
+    </instruction>
+    <instruction order="14" opcode="PUSHS">
+        <arg1 type="bool">false</arg1>
+    </instruction>
+    <instruction order="15" opcode="PUSHS">
+        <arg1 type="float">31.4862</arg1>
+    </instruction>
+    <instruction order="16" opcode="PUSHS">
+        <arg1 type="string" />
+    </instruction>
+    <instruction order="17" opcode="PUSHS">
+        <arg1 type="string">Řetězec\032s\032lomítkem\032\092\032a\010novým\035řádkem</arg1>
+    </instruction>
+    <instruction order="18" opcode="POPS">
+        <arg1 type="var">GF@label</arg1>
+    </instruction>
+    <instruction order="19" opcode="PUSHS">
+        <arg1 type="var">GF@label</arg1>
+    </instruction>
+    <instruction order="20" opcode="DEFVAR">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="21" opcode="POPS">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="22" opcode="POPS">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="23" opcode="POPS">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="24" opcode="POPS">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="25" opcode="POPS">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="26" opcode="POPS">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="27" opcode="WRITE">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="28" opcode="DPRINT">
+        <arg1 type="var">TF@xx</arg1>
+    </instruction>
+    <instruction order="29" opcode="TYPE">
+        <arg1 type="var">TF@xx</arg1>
+        <arg2 type="float">10.34</arg2>
+    </instruction>
+    <instruction order="30" opcode="MOVE">
+        <arg1 type="var">TF@label</arg1>
+        <arg2 type="int">32</arg2>
+    </instruction>
+    <instruction order="31" opcode="INT2CHAR">
+        <arg1 type="var">TF@label</arg1>
+        <arg2 type="int">99</arg2>
+    </instruction>
+    <instruction order="32" opcode="BREAK" />
+</program>
