@@ -385,51 +385,76 @@ if __name__ == "__main__":
                 error(ip, 58, "arg2 instrukce INT2CHAR musi byt hodnota Unicode")  # exit(58)
             var.type = "string"
 
-        elif opcode == "ADD":
+        elif opcode in ["ADD", "SUB", "MUL", "IDIV"]:
             args = parse_args(child, ip, 3)  # exit(32)
             match = parse_var(ip, args[0])
             var = get_var(enviroment, ip, match)
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "int" or symb2.type != "int":
-                error(ip, 58, 'arg2 a arg3 instrukce ADD musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
+                error(ip, 53, 'arg2 a arg3 instrukce ' + opcode + ' musi byt cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
             var.type = "int"
+            if opcode == "ADD":
+                var.value = symb1.value + symb2.value
+            elif opcode == "SUB":
+                var.value = symb1.value - symb2.value
+            elif opcode == "MUL":
+                var.value = symb1.value * symb2.value
+            elif opcode == "IDIV":
+                if symb2.value == 0:
+                    error(ip, 57, "IDIV: Deleni nulou")  # exit(57)
+                var.value = symb1.value // symb2.value
+
+        elif opcode == "CONCAT":
+            args = parse_args(child, ip, 3)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if symb1.type != "string" or symb2.type != "string":
+                error(ip, 53, 'CONCAT: arg2 a arg3 instrukce musi byt retezec, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+            var.type = "string"
             var.value = symb1.value + symb2.value
 
-        elif opcode == "SUB":
+        elif opcode == "STRI2INT":
             args = parse_args(child, ip, 3)  # exit(32)
             match = parse_var(ip, args[0])
             var = get_var(enviroment, ip, match)
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
-            if symb1.type != "int" or symb2.type != "int":
-                error(ip, 58, 'arg2 a arg3 instrukce SUB musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
+            if symb1.type != "string" or symb2.type != "int":
+                error(ip, 53, 'STRI2INT: arg2 musi byt retezec a arg3 cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+            if symb2.value < 0 or symb2.value > len(symb1.value):
+                error(ip, 58, 'STRI2INT: pristup mimo rozsah retezce')  # exit(58)
             var.type = "int"
-            var.value = symb1.value - symb2.value
+            var.value = ord(symb1.value[symb2.value])
 
-        elif opcode == "MUL":
+        elif opcode == "GETCHAR":
             args = parse_args(child, ip, 3)  # exit(32)
             match = parse_var(ip, args[0])
             var = get_var(enviroment, ip, match)
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
-            if symb1.type != "int" or symb2.type != "int":
-                error(ip, 58, 'arg2 a arg3 instrukce MUL musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
-            var.type = "int"
-            var.value = symb1.value * symb2.value
+            if symb1.type != "string" or symb2.type != "int":
+                error(ip, 53, 'GETCHAR: arg2 musi byt retezec a arg3 cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+            if symb2.value < 0 or symb2.value > len(symb1.value):
+                error(ip, 58, 'GETCHAR: pristup mimo rozsah retezce')  # exit(58)
+            var.type = "string"
+            var.value = symb1.value[symb2.value]
 
-        elif opcode == "IDIV":
+        elif opcode == "SETCHAR":
             args = parse_args(child, ip, 3)  # exit(32)
             match = parse_var(ip, args[0])
             var = get_var(enviroment, ip, match)
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
-            if symb1.type != "int" or symb2.type != "int":
-                error(ip, 58, 'arg2 a arg3 instrukce IDIV musi byt cele cislo, zadano: "' + symb1.value + '" a "' + symb2.value + '"')  # exit(58)
-            if symb2.value == 0:
-                error(ip, 57, "Deleni nulou")  # exit(57)
-            var.type = "int"
-            var.value = symb1.value // symb2.value
+            if symb1.type != "int" or symb2.type != "string":
+                error(ip, 53, 'SETCHAR: arg2 musi byt retezec a arg3 cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+            if symb1.value < 0 or symb1.value > len(var.value):
+                error(ip, 58, 'SETCHAR: pristup mimo rozsah retezce')  # exit(58)
+            if len(symb2.value) > 0:
+                error(ip, 58, 'SETCHAR: symb2 musi byt neprazdny rezetec')  # exit(58)
+            var.value[symb1.value] = symb2.value[0]
 
         else:
             if opcode != "LABEL":
