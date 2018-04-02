@@ -32,6 +32,7 @@ class Argument:
 
 
 def help_print():
+    # type: () -> None
     print("Nacte a interpretuje XML reprezentaci programu ze souboru.\n"
           "\n"
           "Pouziti:\n"
@@ -58,11 +59,13 @@ def help_print():
 
 
 def error(order, errno, msg):
+    # type: (int, int, str) -> None
     sys.stderr.write(msg + ", instrukce " + str(order) + "\n")
     sys.exit(errno)
 
 
 def parse_args(child, order, argc):
+    # type: (etree.Element, int, int) -> list
     if len(child) != argc:
         sys.stderr.write('Instrukce ' + str(order) + ' ocekava ' + str(argc) + ' argument(y), predano: ' + str(len(child)) + "\n")
         sys.exit(32)
@@ -79,7 +82,17 @@ def parse_args(child, order, argc):
     return arg
 
 
+def parse_type(order, arg):
+    # type: (int, Argument) -> str
+    if arg.type != "type":
+        error(order, 53, 'Ocekavan argument typu "type", uveden: "' + arg.type + '"')
+    if arg.value not in ["int", "string", "bool", "float"]:
+        error(order, 53, 'Argument "' + arg.value + '" typu "type" nesplnuje pozadovany tvar')
+    return arg.value
+
+
 def parse_label(order, arg):
+    # type: (int, Argument) -> str
     if arg.type != "label":
         error(order, 53, 'Ocekavan argument typu "label", uveden: "' + arg.type + '"')
     if re.fullmatch("[a-zA-Z_\-$&%*][\w_\-$&%*]*", arg.value) is None:
@@ -139,11 +152,11 @@ def get_symb(enviroment, order, arg, undefined=False):
         match = parse_var(order, arg)
         var = get_var(enviroment, order, match)
         if var is None:
-            error(ip, 54, 'Cteni z neexistujici promenne "' + arg.value + '"')  # exit(54)
+            error(order, 54, 'Cteni z neexistujici promenne "' + arg.value + '"')  # exit(54)
         if var.type is None or var.value is None:
             if undefined:
                 return None
-            error(ip, 56, 'Promenne "' + arg.value + '" nebyla dosud prirazena hodnota')  # exit(56)
+            error(order, 56, 'Promenne "' + arg.value + '" nebyla dosud prirazena hodnota')  # exit(56)
     else:
         error(order, 53, 'Ocekavan argument typu int/bool/string/float nebo var, uveden: "' + arg.type + '"')
     return var
@@ -366,7 +379,7 @@ if __name__ == "__main__":
             var = get_var(enviroment, ip, match)
             symb = get_symb(enviroment, ip, args[1], True)  # exit(54/55/56)
             if symb.type != "string":
-                error(ip, 53, "2. argument instrukce STRLEN musi byt retezec")
+                error(ip, 53, "arg2 instrukce STRLEN musi byt retezec")
             var.type = "int"
             var.value = len(symb.value)
 
@@ -392,7 +405,7 @@ if __name__ == "__main__":
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "int" or symb2.type != "int":
-                error(ip, 53, 'arg2 a arg3 instrukce ' + opcode + ' musi byt cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+                error(ip, 53, opcode + ': arg2 a arg3 musi byt cele cislo')  # exit(53)
             var.type = "int"
             if opcode == "ADD":
                 var.value = symb1.value + symb2.value
@@ -412,7 +425,7 @@ if __name__ == "__main__":
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "string" or symb2.type != "string":
-                error(ip, 53, 'CONCAT: arg2 a arg3 instrukce musi byt retezec, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+                error(ip, 53, 'CONCAT: arg2 a arg3 instrukce musi byt retezec')  # exit(53)
             var.type = "string"
             var.value = symb1.value + symb2.value
 
@@ -423,7 +436,7 @@ if __name__ == "__main__":
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "string" or symb2.type != "int":
-                error(ip, 53, 'STRI2INT: arg2 musi byt retezec a arg3 cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+                error(ip, 53, 'STRI2INT: arg2 musi byt retezec a arg3 cele cislo')  # exit(53)
             if symb2.value < 0 or symb2.value > len(symb1.value):
                 error(ip, 58, 'STRI2INT: pristup mimo rozsah retezce')  # exit(58)
             var.type = "int"
@@ -436,7 +449,7 @@ if __name__ == "__main__":
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "string" or symb2.type != "int":
-                error(ip, 53, 'GETCHAR: arg2 musi byt retezec a arg3 cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+                error(ip, 53, 'GETCHAR: arg2 musi byt retezec a arg3 cele cislo')  # exit(53)
             if symb2.value < 0 or symb2.value > len(symb1.value):
                 error(ip, 58, 'GETCHAR: pristup mimo rozsah retezce')  # exit(58)
             var.type = "string"
@@ -449,12 +462,94 @@ if __name__ == "__main__":
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "int" or symb2.type != "string":
-                error(ip, 53, 'SETCHAR: arg2 musi byt retezec a arg3 cele cislo, zadano: "' + str(symb1.value) + '" a "' + str(symb2.value) + '"')  # exit(53)
+                error(ip, 53, 'SETCHAR: arg2 musi byt retezec a arg3 cele cislo')  # exit(53)
             if symb1.value < 0 or symb1.value > len(var.value):
                 error(ip, 58, 'SETCHAR: pristup mimo rozsah retezce')  # exit(58)
             if len(symb2.value) > 0:
                 error(ip, 58, 'SETCHAR: symb2 musi byt neprazdny rezetec')  # exit(58)
             var.value[symb1.value] = symb2.value[0]
+
+        elif opcode in ["JUMPIFEQ", "JUMPIFNEQ"]:
+            args = parse_args(child, ip, 3)  # exit(32)
+            label = parse_label(ip, args[0])
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if label not in enviroment.label:
+                error(ip, 52, 'Navesti "' + label + '" nenalezeno')  # exit(52)
+            if symb1.type != symb2.type:
+                error(ip, 53, opcode + ': arg2 a arg3 museji byt stejneho typu')  # exit(53)
+            if opcode == "JUMPIFEQ" and symb1.value == symb2.value:
+                ip = enviroment.label.get(label)
+            elif opcode == "JUMPIFNEQ" and symb1.value != symb2.value:
+                ip = enviroment.label.get(label)
+
+        elif opcode in ["AND", "OR"]:
+            args = parse_args(child, ip, 3)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if symb1.type != "bool" or symb2.type != "bool":
+                error(ip, 53, opcode + ': arg2 a arg3 musi byt typu bool')  # exit(53)
+            var.type = "bool"
+            if opcode == "AND":
+                var.value = symb1.value and symb2.value
+            else:
+                var.value = symb1.value or symb2.value
+
+        elif opcode == "NOT":
+            args = parse_args(child, ip, 2)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            if symb.type != "bool":
+                error(ip, 53, 'NOT: arg2 musi byt typu bool')  # exit(53)
+            var.type = "bool"
+            var.value = not symb.value
+
+        elif opcode in ["LT", "GT", "EQ"]:
+            args = parse_args(child, ip, 3)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
+            symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
+            if symb1.type != symb2.type:
+                error(ip, 53, opcode + ': arg2 a arg3 museji byt stejneho typu')  # exit(53)
+            var.type = "bool"
+            if opcode == "LT":
+                var.value = symb1.value < symb2.value
+            if opcode == "GT":
+                var.value = symb1.value > symb2.value
+            if opcode == "EQ":
+                var.value = symb1.value == symb2.value
+
+        elif opcode == "READ":
+            args = parse_args(child, ip, 2)  # exit(32)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            typ = parse_type(ip, args[1])
+            try:
+                inp = input()
+            except Exception:
+                inp = None
+            var.type = typ
+            if typ == "int":
+                try:
+                    var.value = int(inp)
+                except (ValueError, TypeError):
+                    var.value = 0
+            elif typ == "string":
+                if inp is not None:
+                    var.value = inp
+                else:
+                    var.value = ""
+            elif typ == "bool":
+                var.value = inp == "true"
+            elif typ == "float":
+                try:
+                    var.value = float(inp)
+                except (ValueError, TypeError):
+                    var.value = 0.0
 
         else:
             if opcode != "LABEL":

@@ -1,43 +1,76 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<program language="IPPcode18">
-    <instruction order="1" opcode="BREAK" />
+<program language="IPPcode18" description="Testing AND/OR/NOT, LT/GT/EQ and READ">
+    <instruction order="1" opcode="DEFVAR">
+        <arg1 type="var">GF@ano</arg1>
+    </instruction>
     <instruction order="2" opcode="DEFVAR">
-        <arg1 type="var">GF@cat1</arg1>
+        <arg1 type="var">GF@ne</arg1>
     </instruction>
     <instruction order="3" opcode="DEFVAR">
-        <arg1 type="var">GF@cat2</arg1>
+        <arg1 type="var">GF@vysl</arg1>
     </instruction>
-    <instruction order="4" opcode="DEFVAR">
-        <arg1 type="var">GF@cat_cil</arg1>
+    <instruction order="4" opcode="MOVE">
+        <arg1 type="var">GF@ano</arg1>
+        <arg2 type="bool">true</arg2>
     </instruction>
     <instruction order="5" opcode="MOVE">
-        <arg1 type="var">GF@cat1</arg1>
-        <arg2 type="string">Hello-</arg2>
+        <arg1 type="var">GF@ne</arg1>
+        <arg2 type="bool">false</arg2>
     </instruction>
-    <instruction order="6" opcode="MOVE">
-        <arg1 type="var">GF@cat2</arg1>
-        <arg2 type="string">world!</arg2>
+    <instruction order="6" opcode="break" />
+    <instruction order="7" opcode="AND">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ano</arg2>
+        <arg3 type="var">GF@ano</arg3>
     </instruction>
-    <instruction order="7" opcode="CONCAT">
-        <arg1 type="var">GF@cat_cil</arg1>
-        <arg2 type="var">GF@cat1</arg2>
-        <arg3 type="var">GF@cat2</arg3>
+    <instruction order="8" opcode="break"/>
+    <instruction order="9" opcode="AND">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ano</arg2>
+        <arg3 type="var">GF@ne</arg3>
     </instruction>
-    <instruction order="8" opcode="DEFVAR">
-        <arg1 type="var">GF@str2_cil</arg1>
+    <instruction order="10" opcode="break"/>
+    <instruction order="11" opcode="AND">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ne</arg2>
+        <arg3 type="var">GF@ne</arg3>
     </instruction>
-    <instruction order="9" opcode="STRI2INT">
-        <arg1 type="var">GF@str2_cil</arg1>
-        <arg2 type="var">GF@cat_cil</arg2>
-        <arg3 type="int">11</arg3>
+    <instruction order="12" opcode="break"/>
+    <instruction order="13" opcode="OR">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ano</arg2>
+        <arg3 type="var">GF@ano</arg3>
     </instruction>
-    <instruction order="10" opcode="DEFVAR">
-        <arg1 type="var">GF@getchar_cil</arg1>
+    <instruction order="14" opcode="break"/>
+    <instruction order="15" opcode="OR">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ano</arg2>
+        <arg3 type="var">GF@ne</arg3>
     </instruction>
-    <instruction order="11" opcode="GETCHAR">
-        <arg1 type="var">GF@getchar_cil</arg1>
-        <arg2 type="var">GF@cat_cil</arg2>
-        <arg3 type="int">0</arg3>
+    <instruction order="16" opcode="break"/>
+    <instruction order="17" opcode="OR">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ne</arg2>
+        <arg3 type="var">GF@ne</arg3>
     </instruction>
-    <instruction order="12" opcode="BREAK" />
+    <instruction order="18" opcode="break"/>
+    <instruction order="19" opcode="NOT">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ano</arg2>
+    </instruction>
+    <instruction order="20" opcode="break"/>
+    <instruction order="21" opcode="NOT">
+        <arg1 type="var">GF@vysl</arg1>
+        <arg2 type="var">GF@ne</arg2>
+    </instruction>
+    <instruction order="22" opcode="break"/>
+    <instruction order="23" opcode="CREATEFRAME" />
+    <instruction order="24" opcode="DEFVAR">
+        <arg1 type="var">TF@load</arg1>
+    </instruction>
+    <instruction order="25" opcode="READ">
+        <arg1 type="var">TF@load</arg1>
+        <arg2 type="type">float</arg2>
+    </instruction>
+    <instruction order="26" opcode="BREAK" />
 </program>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<program language="IPPcode18">
+<program language="IPPcode18" description="Testing frame/stack operations, CALL/LABEL/DPRINT/TYPE">
     <instruction order="1" opcode="CREATEFRAME" />
     <instruction order="2" opcode="PUSHFRAME" />
     <instruction order="3" opcode="CREATEFRAME" />

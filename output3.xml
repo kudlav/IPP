@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<program language="IPPcode18">
+<program language="IPPcode18" description="Testing ADD/SUB/MUL/IDIV">
     <instruction order="1" opcode="BREAK" />
     <instruction order="2" opcode="DEFVAR">
         <arg1 type="var">GF@plus1</arg1>

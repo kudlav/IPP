@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="IPPcode18" description="Testing CONCAT/STRI2INT/GETCHAR">
+    <instruction order="1" opcode="BREAK" />
+    <instruction order="2" opcode="DEFVAR">
+        <arg1 type="var">GF@cat1</arg1>
+    </instruction>
+    <instruction order="3" opcode="DEFVAR">
+        <arg1 type="var">GF@cat2</arg1>
+    </instruction>
+    <instruction order="4" opcode="DEFVAR">
+        <arg1 type="var">GF@cat_cil</arg1>
+    </instruction>
+    <instruction order="5" opcode="MOVE">
+        <arg1 type="var">GF@cat1</arg1>
+        <arg2 type="string">Hello-</arg2>
+    </instruction>
+    <instruction order="6" opcode="MOVE">
+        <arg1 type="var">GF@cat2</arg1>
+        <arg2 type="string">world!</arg2>
+    </instruction>
+    <instruction order="7" opcode="CONCAT">
+        <arg1 type="var">GF@cat_cil</arg1>
+        <arg2 type="var">GF@cat1</arg2>
+        <arg3 type="var">GF@cat2</arg3>
+    </instruction>
+    <instruction order="8" opcode="DEFVAR">
+        <arg1 type="var">GF@str2_cil</arg1>
+    </instruction>
+    <instruction order="9" opcode="STRI2INT">
+        <arg1 type="var">GF@str2_cil</arg1>
+        <arg2 type="var">GF@cat_cil</arg2>
+        <arg3 type="int">11</arg3>
+    </instruction>
+    <instruction order="10" opcode="DEFVAR">
+        <arg1 type="var">GF@getchar_cil</arg1>
+    </instruction>
+    <instruction order="11" opcode="GETCHAR">
+        <arg1 type="var">GF@getchar_cil</arg1>
+        <arg2 type="var">GF@cat_cil</arg2>
+        <arg3 type="int">0</arg3>
+    </instruction>
+    <instruction order="12" opcode="BREAK" />
+</program>
