@@ -109,17 +109,23 @@ def parse_var(order, arg):
     return match
 
 
-def get_var(enviroment, order, match):
+def get_var(enviroment, order, match, write=False):
+    var = None
     if match[1] == "GF":
-        return enviroment.gf.get(match[2])
+        var = enviroment.gf.get(match[2])
     elif match[1] == "TF":
         if enviroment.tf is None:
             error(order, 55, "Docasny ramec neni definovan")  # exit(55)
-        return enviroment.tf.get(match[2])
+        var = enviroment.tf.get(match[2])
     elif match[1] == "LF":
         if enviroment.lf is None:
             error(order, 55, "Lokalni ramec neni nedefinovan")  # exit(55)
-        return enviroment.lf.get(-1).get(match[2])
+        var = enviroment.lf.get(-1).get(match[2])
+    if var is not None and write:
+        error(ip, 59, 'Pokus o redefinovani promenne "' + match[0])  # exit(59)
+    if var is None and not write:
+        error(ip, 54, 'Pristup k neexistujici promenne "' + match[0] + '"')  # exit(54)
+    return var
 
 
 def get_symb(enviroment, order, arg, undefined=False):
@@ -151,8 +157,6 @@ def get_symb(enviroment, order, arg, undefined=False):
     elif arg.type == "var":
         match = parse_var(order, arg)
         var = get_var(enviroment, order, match)
-        if var is None:
-            error(order, 54, 'Cteni z neexistujici promenne "' + arg.value + '"')  # exit(54)
         if var.type is None or var.value is None:
             if undefined:
                 return None
@@ -311,9 +315,7 @@ if __name__ == "__main__":
         elif opcode == "DEFVAR":
             args = parse_args(child, ip, 1)  # exit(32)
             match = parse_var(ip, args[0])
-            var = get_var(enviroment, ip, match)
-            if var is not None:
-                error(ip, 59, 'Pokus o redefinovani promenne "' + match[0])  # exit(59)
+            var = get_var(enviroment, ip, match, True)
             if match[1] == "GF":
                 enviroment.gf[match[2]] = Variable()
             elif match[1] == "TF":
@@ -327,8 +329,6 @@ if __name__ == "__main__":
             var = get_var(enviroment, ip, match)
             if len(enviroment.stack) == 0:
                 error(ip, 56, 'Datovy zasovnik je prazdny "' + match[2])  # exit(56)
-            if var is None:
-                error(ip, 54, 'Pristup k neexistujici promenne "' + match[0] + '"')  # exit(54)
             src = enviroment.stack.pop()
             var.type = src.type
             var.value = src.value
