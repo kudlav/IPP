@@ -5,41 +5,229 @@
  * Date: 03.04.2018
  */
 
-
 // MAIN BEGIN //
-parseParameters($argv);
+$config = parseParameters($argv);
+
+$result = runTests($config);
+
+showResult($result);
 // MAIN END //
 
 
 // BODY BEGIN //
+function helpPrint()
+{
+	echo "Skript slouzi pro automaticke testovani postupne aplikace parse.php a interpret.py" . PHP_EOL
+		. PHP_EOL
+		. "Pouziti:" . PHP_EOL
+		. "./test.php [--help] [--directory=<path>] [--recursive] [--parse-script=<file>] [--int-script=<file>]" . PHP_EOL
+		. "  --help" . PHP_EOL
+		. "    vypise na standardni vystup napovedu skriptu" . PHP_EOL
+		. "  --directory=<path>" . PHP_EOL
+		. "    testy bude hledat v zadanem adresari, pri neuvedeni pouzije aktualni adresar" . PHP_EOL
+		. "  --recursive" . PHP_EOL
+		. "    testy bude hledat i rekurzivne v podadresarich" . PHP_EOL
+		. "  --parse-script=<file>".PHP_EOL
+		. "    soubor se skriptem parse.php, pri neuvedeni pouzije parse.php v aktualnim adresari" . PHP_EOL
+		. "  --int-script=<file>" . PHP_EOL
+		. "    soubor se skriptem interpret.py, pri neuvedeni pouzije interpret.py v aktualnim adresari" . PHP_EOL;
+}
+
+
 function parseParameters($argv)
 {
+	$config = ["parser" => "parse.php", "interpret" => "interpret.py", "tests" => []];
+
+	$recursive = false;
+	$directory = "";
+
 	if (count($argv) > 1) {
+
 		unset($argv[0]); // Drop script path
 
 		foreach ($argv as $argument) {
 			if ($argument == '--help' || $argument == '-h') {
-				echo "Skript slouzi pro automaticke testovani postupne aplikace parse.php a interpret.py" . PHP_EOL
-					. PHP_EOL
-					. "Pouziti:" . PHP_EOL
-					. "./test.php [--help] [--directory=<path>] [--recursive] [--parse-script=<file>] [--int-script=<file>]" . PHP_EOL
-					. "  --help" . PHP_EOL
-					. "    vypise na standardni vystup napovedu skriptu" . PHP_EOL
-					. "  --directory=<path>" . PHP_EOL
-					. "    testy bude hledat v zadanem adresari, pri neuvedeni pouzije aktualni adresar" . PHP_EOL
-					. "  --recursive" . PHP_EOL
-					. "    testy bude hledat i rekurzivne v podadresarich" . PHP_EOL
-					. "  --parse-script=<file>" . PHP_EOL
-					. "    soubor se skriptem parse.php, pri neuvedeni pouzije parse.php v aktualnim adresari" . PHP_EOL
-					. "  --int-script=<file>" . PHP_EOL
-					. "    soubor se skriptem interpret.py, pri neuvedeni pouzije interpret.py v aktualnim adresari" . PHP_EOL
-				;
+				helpPrint();
 				exit(0);
-			}
-			else {
+			} elseif (preg_match('~^\-\-directory=(.*)$~', $argument, $matches)) {
+				$directory = $matches[1];
+			} elseif ($argument == '--recursive') {
+				$recursive = true;
+			} elseif (preg_match('~^\-\-parse-script=(.*)$~', $argument, $matches)) {
+				$config["parser"] = $matches[1];
+			} elseif (preg_match('~^\-\-int-script=(.*)$~', $argument, $matches)) {
+				$config["interpret"] = $matches[1];
+			} else {
+				fwrite(STDERR, "Neznamy parametr: " . $argument . PHP_EOL);
+				helpPrint();
 				exit(10);
 			}
 		}
+	}
+
+	if (!is_dir($directory)) {
+		fwrite(STDERR, 'Adresar "' . $directory . '" neexistuje, nebo z nej nelze cist');
+		exit(11);
+	}
+	$config["tests"] = findFiles($directory, $recursive, []);
+
+	return $config;
+}
+
+
+function findFiles($directory, $recursive, $files)
+{
+	$content = scandir($directory);
+
+	foreach ($content as $item) {
+		$path = $directory . DIRECTORY_SEPARATOR;
+		if (!is_dir($path . $item)) {
+			$matches = [];
+			if (preg_match('~^(.*)\.src$~', $item, $matches)) {
+				$files[] = $path . $matches[1];
+			}
+		} elseif ($recursive && $item != "." && $item != "..") {
+			$files = findFiles($path . $item, true, $files);
+		}
+	}
+
+	return $files;
+}
+
+
+function runTests($config)
+{
+	$result = [
+		"done" => [],
+		"fail" => []
+	];
+
+	$tmpOut = tempnam(".", ".TO");
+	$tmpRun = tempnam(".", ".TR");
+	$tmpErr = tempnam(".", ".TE");
+
+	foreach ($config['tests'] as $test) {
+		prepareFiles($test);
+
+		if (($expectedStatus = file_get_contents($test . ".rc")) === FALSE) {
+			fwrite(STDERR, "Chyba cteni ze souboru: " . $test . ".rc");
+			exit(11);
+		}
+
+		$status = null;
+		$none = [];
+		exec('php5.6 "' . $config["parser"] . '" < "' . $test . '.src" > "' . $tmpOut . '" 2> "' . $tmpErr . '"', $none, $status);
+
+		if ($status != 0) {
+			$expectedStatus = trim($expectedStatus);
+			if ($expectedStatus != $status) {
+				$stderr = file_get_contents($tmpErr);
+				$result["fail"][$test] = "Parser skončil chybou " . $status . ".<br>";
+				if (($expectedStatus = file_get_contents($test . ".rc")) !== FALSE) {
+					$result["fail"][$test] .= "Chybový výstup:<br><pre>" . nl2br($stderr) . "</pre>";
+				}
+			} else {
+				$result["done"][$test] = "Parser správně skončil chybou " . $status . ".";
+			}
+			continue;
+		}
+
+		$status = null;
+		$none = [];
+		exec('python3.6 "' . $config["interpret"] . '" --source="' . $tmpOut . '" < "' . $test . '.in" > "' . $tmpRun . '" 2> "' . $tmpErr . '"', $none, $status);
+
+		if ($expectedStatus != $status) {
+			$result["fail"][$test] = "Interpret skončil s návratovou hodnotou " . $status . ", očekáváno: " . $expectedStatus . ".<br>";
+			$stderr = file_get_contents($tmpErr);
+			if (($expectedStatus = file_get_contents($test . ".rc")) !== FALSE) {
+				$result["fail"][$test] .= "Chybový výstup:<br><pre>" . nl2br($stderr)."</pre>";
+			}
+		} else {
+			if ($status == 0) {	// Diff output with .out file
+				exec('diff "' . $tmpRun . '" "' . $test . '.out" > "' . $tmpOut . '"');
+				if (($diff = file_get_contents($tmpOut))) {
+					$result["fail"][$test] = "Interpret správně skončil s kódem " . $status . ".<br>";
+					$result["fail"][$test] .= "Očekáván jiný výstup interpretu:<br><pre>" . nl2br($diff)."</pre>";
+				}
+				else {
+					$result["done"][$test] = "Interpret správně skončil s kódem " . $status . ".<br>";
+					$result["done"][$test] .= "Výstup interpretu odpovídá souboru out.";
+				}
+			}
+			else {
+				$result["done"][$test] = "Interpret správně skončil s kódem " . $status . ".<br>";
+			}
+		}
+	}
+
+	unlink($tmpOut);
+	unlink($tmpRun);
+	unlink($tmpErr);
+
+	return $result;
+}
+
+
+function prepareFiles($base)
+{
+	if (!is_file($base . ".in")) {
+		if (file_put_contents($base . ".in", "") === FALSE) {
+			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".in");
+			exit(12);
+		}
+	}
+
+	if (!is_file($base . ".out")) {
+		if (file_put_contents($base . ".out", "") === FALSE) {
+			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".out");
+			exit(12);
+		}
+	}
+
+	if (!is_file($base . ".rc")) {
+		if (file_put_contents($base . ".rc", "0") === FALSE) {
+			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".rc");
+			exit(12);
+		}
+	}
+}
+
+
+function showResult($result)
+{
+	$html = file_get_contents("report-top.html");
+	if ($html !== FALSE) {
+		echo $html;
+	}
+
+	$countOk = sizeof($result["done"]);
+	$countErr = sizeof($result["fail"]);
+
+	echo "<p><strong>Úspěšných " . $countOk . " z " . ($countOk + $countErr) . ".</strong></p>";
+
+	echo "<h2>Neúspěšné testy (" . $countErr . ")</h2>";
+	if ($countErr) {
+		echo "<ul>";
+		foreach ($result["fail"] as $test => $msg) {
+			echo "<li><h3><span style='color:#f44336;'>&#10006;</span> " . $test . "</h3>" . $msg . "</li>";
+		}
+		echo "</ul>";
+	}
+	else echo "<p>Žádné neúšpěšné testy.</p>";
+
+	echo "<h2>Úspěšné testy (" . $countOk . ")</h2>";
+	if ($countOk) {
+		echo "<ul>";
+		foreach ($result["done"] as $test => $msg) {
+			echo "<li><h3><span style='color:#4caf50;'>&#10004;</span> " . $test . "</h3>" . $msg . "</li>";
+		}
+		echo "</ul>";
+	}
+	else echo "<p>Žádné úšpěšné testy.</p>";
+
+	$html = file_get_contents("report-bot.html");
+	if ($html !== FALSE) {
+		echo $html;
 	}
 }
 // BODY END //
