@@ -12,7 +12,7 @@
         <arg1 type="var">GF@label</arg1>
     </instruction>
     <instruction order="8" opcode="PUSHS">
-        <arg1 type="string">counter\032obsahuje\032</arg1>
+        <arg1 type="string">counter\032obsahuje\032:</arg1>
     </instruction>
     <instruction order="9" opcode="CALL">
         <arg1 type="label">end</arg1>

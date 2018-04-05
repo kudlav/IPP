@@ -36,10 +36,14 @@ function helpPrint()
 
 function parseParameters($argv)
 {
-	$config = ["parser" => "parse.php", "interpret" => "interpret.py", "tests" => []];
+	$config = [
+		"parser" => "parse.php",
+		"interpret" => "interpret.py",
+		"tests" => []
+	];
 
 	$recursive = false;
-	$directory = "";
+	$directory = ".";
 
 	if (count($argv) > 1) {
 
@@ -65,10 +69,21 @@ function parseParameters($argv)
 		}
 	}
 
-	if (!is_dir($directory)) {
-		fwrite(STDERR, 'Adresar "' . $directory . '" neexistuje, nebo z nej nelze cist');
+	if (!is_file($config["parser"])) {
+		fwrite(STDERR, 'Soubor "' . $config["parser"] . '" neexistuje' . PHP_EOL);
 		exit(11);
 	}
+
+	if (!is_file($config["interpret"])) {
+		fwrite(STDERR, 'Soubor "' . $config["interpret"] . '" neexistuje' . PHP_EOL);
+		exit(11);
+	}
+
+	if (!is_dir($directory)) {
+		fwrite(STDERR, 'Adresar "' . $directory . '" neexistuje, nebo z nej nelze cist' . PHP_EOL);
+		exit(11);
+	}
+
 	$config["tests"] = findFiles($directory, $recursive, []);
 
 	return $config;
@@ -110,7 +125,7 @@ function runTests($config)
 		prepareFiles($test);
 
 		if (($expectedStatus = file_get_contents($test . ".rc")) === FALSE) {
-			fwrite(STDERR, "Chyba cteni ze souboru: " . $test . ".rc");
+			fwrite(STDERR, "Chyba cteni ze souboru: " . $test . ".rc" . PHP_EOL);
 			exit(11);
 		}
 
@@ -172,21 +187,21 @@ function prepareFiles($base)
 {
 	if (!is_file($base . ".in")) {
 		if (file_put_contents($base . ".in", "") === FALSE) {
-			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".in");
+			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".in" . PHP_EOL);
 			exit(12);
 		}
 	}
 
 	if (!is_file($base . ".out")) {
 		if (file_put_contents($base . ".out", "") === FALSE) {
-			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".out");
+			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".out" . PHP_EOL);
 			exit(12);
 		}
 	}
 
 	if (!is_file($base . ".rc")) {
 		if (file_put_contents($base . ".rc", "0") === FALSE) {
-			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".rc");
+			fwrite(STDERR, "Nelze vytvorit chybejici soubor s testy: " . $base . ".rc" . PHP_EOL);
 			exit(12);
 		}
 	}
