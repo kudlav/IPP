@@ -151,7 +151,7 @@ def get_symb(enviroment, order, arg, undefined=False):
             occurences = re.findall("\\\\\d{3}", arg.value)
             for repl in occurences:
                 try:
-                    arg.value = arg.value.replace(repl, chr(int(repl[1:])))
+                    arg.value = arg.value.replace(repl, chr(int(repl[1:])), 1)
                 except ValueError:
                     error(ip, 58, "Escape hodnota v retezci neodpovida kodu Unicode")  # exit(58)
             var.value = arg.value
