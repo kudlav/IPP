@@ -15,6 +15,9 @@ showResult($result);
 
 
 // BODY BEGIN //
+/**
+ * Print description and usage and return codes of this script.
+ */
 function helpPrint()
 {
 	echo "Skript slouzi pro automaticke testovani postupne aplikace parse.php a interpret.py" . PHP_EOL
@@ -30,10 +33,21 @@ function helpPrint()
 		. "  --parse-script=<file>".PHP_EOL
 		. "    soubor se skriptem parse.php, pri neuvedeni pouzije parse.php v aktualnim adresari" . PHP_EOL
 		. "  --int-script=<file>" . PHP_EOL
-		. "    soubor se skriptem interpret.py, pri neuvedeni pouzije interpret.py v aktualnim adresari" . PHP_EOL;
+		. "    soubor se skriptem interpret.py, pri neuvedeni pouzije interpret.py v aktualnim adresari" . PHP_EOL
+		. "Navratove kody:" . PHP_EOL
+        . "  0    ok" . PHP_EOL
+        . "  10   chyba pri zpracovani argumentu" . PHP_EOL
+        . "  11   chyba nacitani vstupniho souboru" . PHP_EOL
+		. "  12   chyba pri otevrirani vystupniho souboru pro zapis" . PHP_EOL
+	;
 }
 
 
+/**
+ * Parse CLI arguments and return array containing configuration.
+ * @param array $argv CLI arguments
+ * @return array Configuration: "parser" with path to parse.php, "interpret" with path to interpret.py and array with all tests.
+ */
 function parseParameters($argv)
 {
 	$config = [
@@ -49,6 +63,7 @@ function parseParameters($argv)
 
 		unset($argv[0]); // Drop script path
 
+		// Check arguments
 		foreach ($argv as $argument) {
 			if ($argument == '--help' || $argument == '-h') {
 				helpPrint();
@@ -69,27 +84,38 @@ function parseParameters($argv)
 		}
 	}
 
+	// Check if parser exists
 	if (!is_file($config["parser"])) {
 		fwrite(STDERR, 'Soubor "' . $config["parser"] . '" neexistuje' . PHP_EOL);
 		exit(11);
 	}
 
+	// Check if interpret exists
 	if (!is_file($config["interpret"])) {
 		fwrite(STDERR, 'Soubor "' . $config["interpret"] . '" neexistuje' . PHP_EOL);
 		exit(11);
 	}
 
+	// Check if directory containg tests exists
 	if (!is_dir($directory)) {
 		fwrite(STDERR, 'Adresar "' . $directory . '" neexistuje, nebo z nej nelze cist' . PHP_EOL);
 		exit(11);
 	}
 
+	// Find tests
 	$config["tests"] = findFiles($directory, $recursive, []);
 
 	return $config;
 }
 
 
+/**
+ * Find all test inside specified directory.
+ * @param string $directory Directory that will be searched
+ * @param bool $recursive Search recusivelly or not
+ * @param  $files Already found test, new test will be appended
+ * @return array Tests inside specified directory
+ */
 function findFiles($directory, $recursive, $files)
 {
 	$content = scandir($directory);
@@ -102,7 +128,7 @@ function findFiles($directory, $recursive, $files)
 				$files[] = $path . $matches[1];
 			}
 		} elseif ($recursive && $item != "." && $item != "..") {
-			$files = findFiles($path . $item, true, $files);
+			$files = findFiles($path . $item, true, $files); // Search recursivelly deeper
 		}
 	}
 
@@ -110,6 +136,11 @@ function findFiles($directory, $recursive, $files)
 }
 
 
+/**
+ * Run tests and return array with result.
+ * @param array $config Config containing execution filepaths and tests
+ * @return array Array containing results divided into two sub-arrays - "done" and "fail"
+ */
 function runTests($config)
 {
 	$result = [
@@ -117,18 +148,23 @@ function runTests($config)
 		"fail" => []
 	];
 
+	// Create temporary files
 	$tmpOut = tempnam(".", ".TO");
 	$tmpRun = tempnam(".", ".TR");
 	$tmpErr = tempnam(".", ".TE");
 
+	// Run individual tests
 	foreach ($config['tests'] as $test) {
+		// Create non-existing files
 		prepareFiles($test);
 
+		// Read from .rc file
 		if (($expectedStatus = file_get_contents($test . ".rc")) === FALSE) {
 			fwrite(STDERR, "Chyba cteni ze souboru: " . $test . ".rc" . PHP_EOL);
 			exit(11);
 		}
 
+		// Run parser, check return code
 		$status = null;
 		$none = [];
 		exec('php5.6 "' . $config["parser"] . '" < "' . $test . '.src" > "' . $tmpOut . '" 2> "' . $tmpErr . '"', $none, $status);
@@ -147,6 +183,7 @@ function runTests($config)
 			continue;
 		}
 
+		// Run interpret, check return code and expected/actual output using diff
 		$status = null;
 		$none = [];
 		exec('python3.6 "' . $config["interpret"] . '" --source="' . $tmpOut . '" < "' . $test . '.in" > "' . $tmpRun . '" 2> "' . $tmpErr . '"', $none, $status);
@@ -175,6 +212,7 @@ function runTests($config)
 		}
 	}
 
+	// Remove temporary files
 	unlink($tmpOut);
 	unlink($tmpRun);
 	unlink($tmpErr);
@@ -183,6 +221,10 @@ function runTests($config)
 }
 
 
+/**
+ * Check and create non-existing .in, .out and .rc files with default values.
+ * @param string $base Test name - filename without extension
+ */
 function prepareFiles($base)
 {
 	if (!is_file($base . ".in")) {
@@ -208,13 +250,19 @@ function prepareFiles($base)
 }
 
 
+/**
+ * Generate HTML page for results, print it to stdout.
+ * @param array $result Results gained from runTests function
+ */
 function showResult($result)
 {
+	// Get and print header of HTML
 	$html = file_get_contents("report-top.html");
 	if ($html !== FALSE) {
 		echo $html;
 	}
 
+	// Print body containing tests
 	$countOk = sizeof($result["done"]);
 	$countErr = sizeof($result["fail"]);
 
@@ -240,6 +288,7 @@ function showResult($result)
 	}
 	else echo "<p>Žádné úšpěšné testy.</p>";
 
+	// Get and print bottom of HTML
 	$html = file_get_contents("report-bot.html");
 	if ($html !== FALSE) {
 		echo $html;
