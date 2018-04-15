@@ -7,6 +7,7 @@ import re
 
 
 class Enviroment:
+    """The class represents enviroment of process. Contains stacks and frame (variables storage)"""
     def __init__(self):
         self.gf = {}
         self.lf = None
@@ -17,6 +18,7 @@ class Enviroment:
 
 
 class Variable:
+    """The class used for storing any value. Contains value and it's type"""
     def __init__(self, datatype=None, value=None):
         self.type = datatype
         self.value = value
@@ -26,13 +28,17 @@ class Variable:
 
 
 class Argument:
+    """The class represents argX element. Contains value and it's type (eg. int, var, type...)"""
     def __init__(self, argtype, value):
         self.type = argtype
         self.value = value
 
 
 def help_print():
+    """
+    Print description, usage and return codes of this script.
     # type: () -> None
+    """
     print("Nacte a interpretuje XML reprezentaci programu ze souboru.\n"
           "\n"
           "Pouziti:\n"
@@ -59,13 +65,20 @@ def help_print():
 
 
 def error(order, errno, msg):
+    """
+    Print error message to stderr with number of line and exit program with specified return code.
     # type: (int, int, str) -> None
+    """
     sys.stderr.write(msg + ", instrukce " + str(order) + "\n")
     sys.exit(errno)
 
 
 def parse_args(child, order, argc):
+    """
+    Get array of Argument from instruction xml element.
+    Also check number of arguments and exit program when element is not valid.
     # type: (etree.Element, int, int) -> list
+    """
     if len(child) != argc:
         sys.stderr.write('Instrukce ' + str(order) + ' ocekava ' + str(argc) + ' argument(y), predano: ' + str(len(child)) + "\n")
         sys.exit(32)
@@ -83,7 +96,12 @@ def parse_args(child, order, argc):
 
 
 def parse_type(order, arg):
+    """
+    Check whether Argument is valid type name.
+
+    Return name of type if valid, otherwise exit program.
     # type: (int, Argument) -> str
+    """
     if arg.type != "type":
         error(order, 53, 'Ocekavan argument typu "type", uveden: "' + arg.type + '"')
     if arg.value not in ["int", "string", "bool", "float"]:
@@ -92,7 +110,12 @@ def parse_type(order, arg):
 
 
 def parse_label(order, arg):
+    """
+    Check whether Argument is valid label name.
+
+    Return name of label if valid, otherwise exit program.
     # type: (int, Argument) -> str
+    """
     if arg.type != "label":
         error(order, 53, 'Ocekavan argument typu "label", uveden: "' + arg.type + '"')
     if re.fullmatch("[a-zA-Z_\-$&%*][\w_\-$&%*]*", arg.value) is None:
@@ -101,6 +124,13 @@ def parse_label(order, arg):
 
 
 def parse_var(order, arg):
+    """
+    Check whether Argument is valid variable identificator.
+
+    Return variable identificator splitted into parts if valid, otherwise exit program.
+    [0]=origin string, [1]=scope (LF/TF/GF), [2]=variable name
+    # type: (int, Argument) -> list
+    """
     if arg.type != "var":
         error(order, 53, 'Ocekavan argument typu "var", uveden: "' + arg.type + '"')
     match = re.fullmatch("(LF|TF|GF)@([a-zA-Z_\-$&%*][\w_\-$&%*]*)", arg.value)
@@ -110,6 +140,12 @@ def parse_var(order, arg):
 
 
 def get_var(enviroment, order, match, write=False):
+    """
+    Get link to existing Variable from parsed variable identification gain from parse_var function.
+
+    If trying to write into undefined variable or define already defined variable, exit program.
+    # type: (Enviroment, int, list, bool) -> Variable
+    """
     var = None
     if match[1] == "GF":
         var = enviroment.gf.get(match[2])
@@ -129,6 +165,11 @@ def get_var(enviroment, order, match, write=False):
 
 
 def get_symb(enviroment, order, arg, undefined=False):
+    """
+    Parse and Get new virtual Variable object from Argument.
+
+    # type: (Enviroment, int, Argument, bool) -> Variable
+    """
     var = Variable(arg.type)
     if arg.type == "int":
         try:
@@ -173,6 +214,7 @@ def get_symb(enviroment, order, arg, undefined=False):
 
 
 if __name__ == "__main__":
+    # Parse CLI arguments
     try:
         (opts, args) = getopt.getopt(sys.argv[1:], "hs:", ["help", "source=", "stats=", "insts", "vars"])
     except getopt.GetoptError as err:
@@ -185,7 +227,6 @@ if __name__ == "__main__":
     statpath = ""
     stati = []
 
-    # Parse CLI arguments
     for option, value in opts:
         if option in ("-h", "--help"):
             help_print()
@@ -591,7 +632,7 @@ if __name__ == "__main__":
                     var.value = 0.0
 
         else:
-            if opcode != "LABEL":
+            if opcode != "LABEL":  # Labels are already preprocessed
                 sys.stderr.write('Neznama instrukce: "' + opcode + '"\n')
                 sys.exit(32)
 
