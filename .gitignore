@@ -1,2 +1,4 @@
 .idea/
 IPP-parse.iml
+ipp_tests/
+tests/
