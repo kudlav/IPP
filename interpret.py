@@ -120,7 +120,7 @@ def get_var(enviroment, order, match, write=False):
     elif match[1] == "LF":
         if enviroment.lf is None:
             error(order, 55, "Lokalni ramec neni nedefinovan")  # exit(55)
-        var = enviroment.lf.get(-1).get(match[2])
+        var = enviroment.lf[-1].get(match[2])
     if var is not None and write:
         error(ip, 59, 'Pokus o redefinovani promenne "' + match[0])  # exit(59)
     if var is None and not write:
@@ -174,7 +174,7 @@ def get_symb(enviroment, order, arg, undefined=False):
 
 if __name__ == "__main__":
     try:
-        (opts, args) = getopt.getopt(sys.argv[1:], "hs:", ["help", "source="])
+        (opts, args) = getopt.getopt(sys.argv[1:], "hs:", ["help", "source=", "stats=", "insts", "vars"])
     except getopt.GetoptError as err:
         if err.opt != "":
             sys.stderr.write("Nespravne pouziti parametru: " + err.opt + "\n")
@@ -182,23 +182,46 @@ if __name__ == "__main__":
         sys.exit(10)
 
     filepath = ""
+    statpath = ""
+    stati = []
 
+    # Parse CLI arguments
     for option, value in opts:
         if option in ("-h", "--help"):
             help_print()
             sys.exit(0)
         elif option in ("-s", "--source"):
             filepath = value
+        elif option == "--stats":
+            statpath = value
+        elif option == "--insts":
+            if len(stati) != 0 and stati[0] == "insts":
+                sys.stderr.write("Argument 'insts' byl pouzit dvakrat.\n")
+                help_print()
+                sys.exit(10)
+            stati.append("insts")
+        elif option == "--vars":
+            if len(stati) != 0 and stati[0] == "vars":
+                sys.stderr.write("Argument 'vars' byl pouzit dvakrat.\n")
+                help_print()
+                sys.exit(10)
+            stati.append("vars")
         else:
             sys.stderr.write("Neznamy parametr: " + option + "\n")
             help_print()
             sys.exit(10)
+
+    if len(stati) > 0 and statpath == "":
+        sys.stderr.write("Parametry --insts ci --vars musi byt pouzity spolu se --stats\n")
+        help_print()
+        sys.exit(10)
 
     if filepath == "":
         sys.stderr.write("Chyby povinny parametr: --source=<file>\n")
         help_print()
         sys.exit(10)
 
+    # Load and parse XML
     try:
         tree = etree.parse(filepath)
     except FileNotFoundError:
@@ -257,6 +280,7 @@ if __name__ == "__main__":
 
     # Browse instruction elements
     i_count = 0
+    v_count = 0
     ip = 1
     while ip < len(root)+1:
         child = instructions.get(ip)
@@ -289,7 +313,7 @@ if __name__ == "__main__":
             parse_args(child, ip, 0)  # exit(32)
             if len(enviroment.call) == 0:
                 error(ip, 56, "Cteni z prazdneho zasobniku volani")  # exit(56)
-            i = enviroment.call.pop()
+            ip = enviroment.call.pop()
 
         elif opcode == "BREAK":
             parse_args(child, ip, 0)  # exit(32)
@@ -308,7 +332,7 @@ if __name__ == "__main__":
             label = parse_label(ip, args[0])
             if label not in enviroment.label:
                 error(ip, 52, 'Navesti "' + label + '" nenalezeno')  # exit(52)
-            enviroment.call.append(ip+1)
+            enviroment.call.append(ip)
             ip = enviroment.label.get(label)
 
         elif opcode == "JUMP":
@@ -327,7 +351,16 @@ if __name__ == "__main__":
             elif match[1] == "TF":
                 enviroment.tf[match[2]] = Variable()
             elif match[1] == "LF":
-                enviroment.tf[match[2]] = Variable()
+                enviroment.lf[-1][match[2]] = Variable()
+            # Compute variables for STATI:
+            actual_count = len(enviroment.gf)
+            if enviroment.tf is not None:
+                actual_count += len(enviroment.tf)
+            if enviroment.lf is not None:
+                for lf in enviroment.lf:
+                    actual_count += len(lf)
+            if actual_count > v_count:
+                v_count = actual_count
 
         elif opcode == "POPS":
             args = parse_args(child, ip, 1)  # exit(32)
@@ -443,7 +476,7 @@ if __name__ == "__main__":
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "string" or symb2.type != "int":
                 error(ip, 53, 'STRI2INT: arg2 musi byt retezec a arg3 cele cislo')  # exit(53)
-            if symb2.value < 0 or symb2.value > len(symb1.value):
+            if symb2.value < 0 or symb2.value >= len(symb1.value):
                 error(ip, 58, 'STRI2INT: pristup mimo rozsah retezce')  # exit(58)
             var.type = "int"
             var.value = ord(symb1.value[symb2.value])
@@ -456,7 +489,7 @@ if __name__ == "__main__":
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "string" or symb2.type != "int":
                 error(ip, 53, 'GETCHAR: arg2 musi byt retezec a arg3 cele cislo')  # exit(53)
-            if symb2.value < 0 or symb2.value > len(symb1.value):
+            if symb2.value < 0 or symb2.value >= len(symb1.value):
                 error(ip, 58, 'GETCHAR: pristup mimo rozsah retezce')  # exit(58)
             var.type = "string"
             var.value = symb1.value[symb2.value]
@@ -469,11 +502,11 @@ if __name__ == "__main__":
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
             if symb1.type != "int" or symb2.type != "string":
                 error(ip, 53, 'SETCHAR: arg2 musi byt retezec a arg3 cele cislo')  # exit(53)
-            if symb1.value < 0 or symb1.value > len(var.value):
+            if symb1.value < 0 or symb1.value >= len(var.value):
                 error(ip, 58, 'SETCHAR: pristup mimo rozsah retezce')  # exit(58)
-            if len(symb2.value) > 0:
+            if len(symb2.value) <= 0:
                 error(ip, 58, 'SETCHAR: symb2 musi byt neprazdny rezetec')  # exit(58)
-            var.value[symb1.value] = symb2.value[0]
+            var.value = var.value[:symb1.value] + symb2.value[0] + var.value[symb1.value+1:]
 
         elif opcode in ["JUMPIFEQ", "JUMPIFNEQ"]:
             args = parse_args(child, ip, 3)  # exit(32)
@@ -564,5 +597,18 @@ if __name__ == "__main__":
 
         ip += 1
         i_count += 1
+
+    # Write statistic data
+    if statpath != "":
+        try:
+            with open(statpath, 'w') as file:
+                for st in stati:
+                    if st == "insts":
+                        file.write(str(i_count) + "\n")
+                    else:
+                        file.write(str(v_count) + "\n")
+        except (PermissionError, FileNotFoundError):
+            sys.stderr.write('Chyba pri otevirani souboru "' + statpath + ' pro zapis statistik"\n')
+            sys.exit(11)
 
     sys.exit(0)
