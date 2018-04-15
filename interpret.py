@@ -73,6 +73,27 @@ def error(order, errno, msg):
     sys.exit(errno)
 
 
+def load_xml(filepath):
+    """
+    Get root "program" element from specified file, exit program if error occurs.
+    # type: (str) -> etree.Element
+    """
+    try:
+        tree = etree.parse(filepath)
+    except FileNotFoundError:
+        sys.stderr.write('Soubor "' + filepath + '" neexistuje\n')
+        sys.exit(11)
+    except etree.ParseError as err:
+        sys.stderr.write('Soubor "' + filepath + '" neobsahuje platny XML soubor\n' + err.msg + "\n")
+        sys.exit(31)
+
+    root = tree.getroot()
+    if root.tag != "program" or root.get("language") != "IPPcode18":
+        sys.stderr.write('Chybi korenovy element "program" s atributem "language=IPPcode18"\n')
+        sys.exit(31)
+    return root
+
+
 def parse_args(child, order, argc):
     """
     Get array of Argument from instruction xml element.
@@ -213,6 +234,24 @@ def get_symb(enviroment, order, arg, undefined=False):
     return var
 
 
+def write_stats(statpath, stati, i_count, v_count):
+    """
+    Write statistics if statpath is set according to STATI arguments.
+    # type: (str, list, int, int) -> None
+    """
+    if statpath != "":
+        try:
+            with open(statpath, 'w') as file:
+                for st in stati:
+                    if st == "insts":
+                        file.write(str(i_count) + "\n")
+                    else:
+                        file.write(str(v_count) + "\n")
+        except (PermissionError, FileNotFoundError):
+            sys.stderr.write('Chyba pri otevirani souboru "' + statpath + ' pro zapis statistik"\n')
+            sys.exit(11)
+
+
 if __name__ == "__main__":
     # Parse CLI arguments
     try:
@@ -263,19 +302,7 @@ if __name__ == "__main__":
         sys.exit(10)
 
     # Load and parse XML
-    try:
-        tree = etree.parse(filepath)
-    except FileNotFoundError:
-        sys.stderr.write('Soubor "' + filepath + '" neexistuje\n')
-        sys.exit(11)
-    except etree.ParseError as err:
-        sys.stderr.write('Soubor "' + filepath + '" neobsahuje platny XML soubor\n' + err.msg + "\n")
-        sys.exit(31)
-
-    root = tree.getroot()
-    if root.tag != "program" or root.get("language") != "IPPcode18":
-        sys.stderr.write('Chybi korenovy element "program" s atributem "language=IPPcode18"\n')
-        sys.exit(31)
+    root = load_xml(filepath)
 
     # Check for syntax errors and find index of all LABELs, order instructions
     enviroment = Enviroment()
@@ -640,16 +667,6 @@ if __name__ == "__main__":
         i_count += 1
 
     # Write statistic data
-    if statpath != "":
-        try:
-            with open(statpath, 'w') as file:
-                for st in stati:
-                    if st == "insts":
-                        file.write(str(i_count) + "\n")
-                    else:
-                        file.write(str(v_count) + "\n")
-        except (PermissionError, FileNotFoundError):
-            sys.stderr.write('Chyba pri otevirani souboru "' + statpath + ' pro zapis statistik"\n')
-            sys.exit(11)
+    write_stats(statpath, stati, i_count, v_count)
 
     sys.exit(0)
