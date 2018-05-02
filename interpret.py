@@ -679,6 +679,111 @@ if __name__ == "__main__":
             else:
                 error(ip, 53, 'Hodnota "' + str(var.value) + '" neni typu float')  # exit(53)
 
+        elif opcode == "CLEARS":
+            enviroment.stack.clear()
+
+        elif opcode in ["ADDS", "SUBS", "MULS", "IDIVS"]:
+            if len(enviroment.stack) < 2:
+                error(ip, 56, 'Na datovem zasobniku musi byt alespon 2 hodnoty!')  # exit(56)
+            symb2 = enviroment.stack.pop()
+            symb1 = enviroment.stack.pop()
+            if symb1.type != symb2.type or (symb1.type != "int" and symb1.type != "float"):
+                error(ip, 53, opcode + ': arg2 a arg3 musi byt typu int a int nebo typu float a float')  # exit(53)
+            var = Variable(symb1.type)
+            if opcode == "ADDS":
+                var.value = symb1.value + symb2.value
+            elif opcode == "SUBS":
+                var.value = symb1.value - symb2.value
+            elif opcode == "MULS":
+                var.value = symb1.value * symb2.value
+            elif opcode == "IDIVS":
+                if symb2.value == 0:
+                    error(ip, 57, "IDIV: Deleni nulou")  # exit(57)
+                var.value = symb1.value // symb2.value
+            enviroment.stack.append(var)
+
+        elif opcode in ["LTS", "GTS", "EQS"]:
+            if len(enviroment.stack) < 2:
+                error(ip, 56, 'Na datovem zasobniku musi byt alespon 2 hodnoty!')  # exit(56)
+            symb2 = enviroment.stack.pop()
+            symb1 = enviroment.stack.pop()
+            if symb1.type != symb2.type:
+                error(ip, 53, opcode + ': arg2 a arg3 museji byt stejneho typu')  # exit(53)
+            var = Variable(symb1.type)
+            if opcode == "LTS":
+                var.value = symb1.value < symb2.value
+            if opcode == "GTS":
+                var.value = symb1.value > symb2.value
+            if opcode == "EQS":
+                var.value = symb1.value == symb2.value
+            enviroment.stack.append(var)
+
+        elif opcode in ["ANDS", "ORS"]:
+            if len(enviroment.stack) < 2:
+                error(ip, 56, 'Na datovem zasobniku musi byt alespon 2 hodnoty!')  # exit(56)
+            symb2 = enviroment.stack.pop()
+            symb1 = enviroment.stack.pop()
+            if symb1.type != "bool" or symb2.type != "bool":
+                error(ip, 53, opcode + ': arg2 a arg3 musi byt typu bool')  # exit(53)
+            var = Variable("bool")
+            if opcode == "ANDS":
+                var.value = symb1.value and symb2.value
+            else:
+                var.value = symb1.value or symb2.value
+            enviroment.stack.append(var)
+
+        elif opcode == "NOTS":
+            if len(enviroment.stack) < 1:
+                error(ip, 56, 'Na datovem zasobniku musi byt alespon 1 hodnota!')  # exit(56)
+            symb = enviroment.stack.pop()
+            if symb.type != "bool":
+                error(ip, 53, 'NOT: arg2 musi byt typu bool')  # exit(53)
+            var = Variable("bool")
+            var.value = not symb.value
+            enviroment.stack.append(var)
+
+        elif opcode == "INT2CHARS":
+            if len(enviroment.stack) < 1:
+                error(ip, 56, 'Na datovem zasobniku musi byt alespon 1 hodnota!')  # exit(56)
+            symb = enviroment.stack.pop()
+            var = Variable("string")
+            try:
+                if symb.type != "int":
+                    raise ValueError
+                var.value = chr(symb.value)
+            except ValueError:
+                error(ip, 58, "Hodnota na datovem zasobniku pro instrukci INT2CHAR musi byt hodnotou Unicode")  # exit(58)
+            enviroment.stack.append(var)
+
+        elif opcode == "STRI2INTS":
+            if len(enviroment.stack) < 2:
+                error(ip, 56, 'Na datovem zasobniku musi byt alespon 2 hodnoty!')  # exit(56)
+            symb2 = enviroment.stack.pop()
+            symb1 = enviroment.stack.pop()
+            if symb1.type != "string" or symb2.type != "int":
+                error(ip, 53, 'STRI2INT: arg2 musi byt retezec a arg3 cele cislo')  # exit(53)
+            if symb2.value < 0 or symb2.value >= len(symb1.value):
+                error(ip, 58, 'STRI2INT: pristup mimo rozsah retezce')  # exit(58)
+            var = Variable("int")
+            var.value = ord(symb1.value[symb2.value])
+            enviroment.stack.append(var)
+
+        elif opcode in ["JUMPIFEQS", "JUMPIFNEQS"]:
+            args = parse_args(child, ip, 1)  # exit(32)
+            label = parse_label(ip, args[0])
+            if label not in enviroment.label:
+                error(ip, 52, 'Navesti "' + label + '" nenalezeno')  # exit(52)
+            if len(enviroment.stack) < 2:
+                error(ip, 56, 'Na datovem zasobniku musi byt alespon 2 hodnoty!')  # exit(56)
+            symb2 = enviroment.stack.pop()
+            symb1 = enviroment.stack.pop()
+            if symb1.type != symb2.type:
+                error(ip, 53, opcode + ': arg2 a arg3 museji byt stejneho typu')  # exit(53)
+            if opcode == "JUMPIFEQS" and symb1.value == symb2.value:
+                ip = enviroment.label.get(label)
+            elif opcode == "JUMPIFNEQS" and symb1.value != symb2.value:
+                ip = enviroment.label.get(label)
+
         else:
             if opcode != "LABEL":  # Labels are already preprocessed
                 sys.stderr.write('Neznama instrukce: "' + opcode + '"\n')
