@@ -139,8 +139,8 @@ def parse_label(order, arg):
     """
     if arg.type != "label":
         error(order, 53, 'Ocekavan argument typu "label", uveden: "' + arg.type + '"')
-    if re.fullmatch("[a-zA-Z_\-$&%*][\w_\-$&%*]*", arg.value) is None:
-        error(order, 53, 'Argument "' + arg.value + '" typu "label" nesplnuje pozadovany tvar')
+    if arg.value is None or re.fullmatch("[a-zA-Z_\-$&%*][\w_\-$&%*]*", arg.value) is None:
+        error(order, 53, 'Argument "' + str(arg.value) + '" typu "label" nesplnuje pozadovany tvar')
     return arg.value
 
 
@@ -154,9 +154,10 @@ def parse_var(order, arg):
     """
     if arg.type != "var":
         error(order, 53, 'Ocekavan argument typu "var", uveden: "' + arg.type + '"')
-    match = re.fullmatch("(LF|TF|GF)@([a-zA-Z_\-$&%*][\w_\-$&%*]*)", arg.value)
-    if match is None:
-        error(order, 53, 'Argument "' + arg.value + '" typu "var" nesplnuje pozadovany tvar')
+    if arg.value is not None:
+        match = re.fullmatch("(LF|TF|GF)@([a-zA-Z_\-$&%*][\w_\-$&%*]*)", arg.value)
+    if arg.value is None or match is None:
+        error(order, 53, 'Argument "' + str(arg.value) + '" typu "var" nesplnuje pozadovany tvar')
     return match
 
 
@@ -203,7 +204,7 @@ def get_symb(enviroment, order, arg, undefined=False):
         elif arg.value == "false":
             var.value = False
         else:
-            error(order, 53, 'Hodnota "' + arg.value + '" neni typu bool')  # exit(55)
+            error(order, 53, 'Hodnota "' + str(arg.value) + '" neni typu bool')  # exit(55)
     elif arg.type == "string":
         if arg.value is None:
             var.value = ""
@@ -219,7 +220,7 @@ def get_symb(enviroment, order, arg, undefined=False):
             var.value = arg.value
     elif arg.type == "float":
         try:
-            var.value = float(arg.value)
+            var.value = float.fromhex(arg.value)
         except (ValueError, TypeError):
             error(order, 53, 'Hodnota "' + str(arg.value) + '" neni typu float')  # exit(55)
     elif arg.type == "var":
@@ -497,8 +498,6 @@ if __name__ == "__main__":
             symb = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             try:
                 if symb.type != "int":
-                    print(symb.type)
-                    print(symb.value)
                     raise ValueError
                 var.value = chr(symb.value)
             except ValueError:
@@ -511,9 +510,9 @@ if __name__ == "__main__":
             var = get_var(enviroment, ip, match)
             symb1 = get_symb(enviroment, ip, args[1])  # exit(54/55/56)
             symb2 = get_symb(enviroment, ip, args[2])  # exit(54/55/56)
-            if symb1.type != "int" or symb2.type != "int":
-                error(ip, 53, opcode + ': arg2 a arg3 musi byt cele cislo')  # exit(53)
-            var.type = "int"
+            if symb1.type != symb2.type or (symb1.type != "int" and symb1.type != "float"):
+                error(ip, 53, opcode + ': arg2 a arg3 musi byt typu int a int nebo typu float a float')  # exit(53)
+            var.type = symb1.type
             if opcode == "ADD":
                 var.value = symb1.value + symb2.value
             elif opcode == "SUB":
@@ -654,9 +653,31 @@ if __name__ == "__main__":
                 var.value = inp == "true"
             elif typ == "float":
                 try:
-                    var.value = float(inp)
+                    var.value = float.fromhex(inp)
                 except (ValueError, TypeError):
-                    var.value = 0.0
+                    error(ip, 53, 'Hodnota "' + str(var.value) + '" neni typu float')  # exit(53)
+
+        elif opcode == "INT2FLOAT":
+            args = parse_args(child, ip, 2)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb = get_symb(enviroment, ip, args[1])
+            if symb.type == "int":
+                var.type = "float"
+                var.value = float(symb.value)
+            else:
+                error(ip, 53, 'Hodnota "' + str(var.value) + '" neni typu int')  # exit(53)
+
+        elif opcode == "FLOAT2INT":
+            args = parse_args(child, ip, 2)
+            match = parse_var(ip, args[0])
+            var = get_var(enviroment, ip, match)
+            symb = get_symb(enviroment, ip, args[1])
+            if symb.type == "float":
+                var.type = "int"
+                var.value = int(symb.value)
+            else:
+                error(ip, 53, 'Hodnota "' + str(var.value) + '" neni typu float')  # exit(53)
 
         else:
             if opcode != "LABEL":  # Labels are already preprocessed
